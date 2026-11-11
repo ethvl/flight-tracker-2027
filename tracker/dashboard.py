@@ -5,13 +5,16 @@ expands in place to show airlines, times and booking links -> value ranking.
 """
 from __future__ import annotations
 
+import base64
+import json
 import os
 from datetime import datetime
+from functools import lru_cache
 from html import escape as e
 
 from .aggregate import coverage
 from .analysis import DailyReport, DestReport
-from .config import Config
+from .config import ROOT, Config
 from .links import airline_site, build_links, google_flights, kayak, skyscanner
 from .logos import avatar
 
@@ -119,23 +122,36 @@ background:var(--tint,var(--glow1));filter:blur(50px);pointer-events:none}
 .unit{white-space:nowrap;font-size:.85rem;font-weight:400;letter-spacing:0;color:var(--muted);margin-left:6px}
 .s .cap{color:var(--ink2);font-size:.9rem;position:relative}
 /* destination cards */
-.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-flow:row dense;gap:20px;align-items:start}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-flow:row dense;gap:20px;align-items:start}
 .d{position:relative;min-width:0;transition:transform .3s ease-out,border-color .3s ease-out,background-color .3s ease-out}
 .d:hover{transform:scale(1.01);border-color:var(--line-hi);background:var(--card-hi)}
 .d.open{transform:none;border-color:var(--line-hi);background:var(--card-hi)}
 .d.na{box-shadow:none}
 .d.na .name,.d.na .tot{color:var(--muted)}
-.head{all:unset;box-sizing:border-box;display:flex;flex-direction:column;gap:18px;width:100%;padding:24px;cursor:pointer;border-radius:24px}
+.head{all:unset;box-sizing:border-box;display:flex;flex-direction:column;gap:18px;width:100%;--pad:24px;padding:var(--pad);cursor:pointer;border-radius:24px}
+.d{overflow:hidden}
+/* photo banner with legible overlay text */
+.ban{position:relative;display:flex;flex-direction:column;justify-content:flex-end;gap:10px;min-height:168px;margin:calc(-1*var(--pad)) calc(-1*var(--pad)) 0;
+padding:20px var(--pad) 16px;color:#fff;background-color:#2c3440;background-image:var(--img),var(--tint-bg,linear-gradient(135deg,#46566e,#1d232c));background-size:cover;background-position:center}
+.ban::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05) 0%,rgba(0,0,0,.18) 40%,rgba(0,0,0,.72) 100%)}
+.ban>*{position:relative}
+.ban .name{color:#fff;font-size:1.5rem;font-weight:700;text-shadow:0 1px 12px rgba(0,0,0,.35)}
+.ban .where{color:rgba(255,255,255,.82)}
+.ban .pill{color:#fff;background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.28);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.ban .pill.solid{color:#111;background:rgba(255,255,255,.92);border-color:transparent}
+.ban .pill.save{color:#052e12;background:#5fe08a;border-color:transparent}
+.ban .pill.unmet{color:#fff;background:rgba(0,0,0,.25);border-color:rgba(255,255,255,.45)}
+.d.na .ban{filter:grayscale(.9) brightness(.9)}
+.d:hover .ban{background-size:cover}
 .head:focus-visible{outline:2px solid var(--ink);outline-offset:-4px}
 .id{display:flex;align-items:center;gap:14px}
 .ico{width:44px;height:44px;flex:none;border-radius:13px;display:grid;place-items:center;background:var(--inset);border:1px solid var(--line);color:var(--ink2)}
 .ico svg{width:22px;height:22px}
 .name{font-size:1.3rem;font-weight:600;letter-spacing:-.02em;line-height:1.2}
 .where{font-size:.82rem;color:var(--muted);font-weight:400}
-.plus{margin-left:auto;width:30px;height:30px;flex:none;border-radius:50%;display:grid;place-items:center;background:var(--inset);color:var(--ink2);
-transition:transform .45s var(--ease),background-color .2s}
+.plus{position:absolute;top:14px;right:14px;z-index:3;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:rgba(0,0,0,.38);color:#fff;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:transform .45s var(--ease),background-color .2s}
 .plus svg{width:14px;height:14px}
-.open .plus{transform:rotate(45deg);background:var(--line)}
+.open .plus{transform:rotate(45deg);background:rgba(0,0,0,.55)}
 .price{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
 .tot{font-size:2.6rem;font-weight:700;letter-spacing:-.04em;line-height:1}
 .per{font-size:.9rem;color:var(--ink2);margin-top:8px;font-weight:400}
@@ -189,10 +205,8 @@ background:var(--btn);color:var(--btn-ink);transition:transform .2s var(--ease),
 .opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px 32px}
 .opts .opt{padding-top:20px;border-top:1px solid var(--line)}
 /* open card: full row; summary column left (sticky), flights right; close button pinned top-right */
-.d.open .plus{position:absolute;top:18px;right:18px;margin:0;z-index:2}
-.d.open .head{padding-right:64px}
 @media (min-width:641px){.d.open{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,320px) minmax(0,1fr);align-items:start}
-.d.open .head{position:sticky;top:12px;padding-right:24px}
+.d.open .head{position:sticky;top:12px}
 .d.open .sheet{padding:24px 64px 28px 8px}.d.open .sheet>hr:first-child{display:none}
 .d.open .facts{grid-template-columns:repeat(4,minmax(0,1fr))}.d.open .opts{grid-template-columns:1fr}}
 @media (min-width:900px){.d.open .opt{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px 20px;align-items:start}
@@ -215,10 +229,11 @@ background:var(--btn);color:var(--btn-ink);transition:transform .2s var(--ease),
 .bars .n{font-weight:500}.bars .v{color:var(--muted);font-size:.85rem;text-align:right}
 .track{height:4px;border-radius:2px;background:var(--line)}
 .track i{display:block;height:100%;border-radius:2px}
+footer a{color:inherit}
 footer{color:var(--muted);font-size:.78rem;max-width:80ch;line-height:1.6}
-@media (max-width:1000px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.spot{grid-template-columns:1fr}.s{padding:28px}}
+@media (max-width:1000px){.spot{grid-template-columns:1fr}.s{padding:28px}}
 @media (max-width:640px){.wrap{gap:48px;padding-block:36px 64px}.grid{grid-template-columns:1fr;gap:14px}.spot{gap:14px}
-.ov{grid-template-columns:1fr;padding:22px}.ov .chips{justify-content:flex-start}.ovr{gap:10px}.rbtn{padding:9px 14px}.head{padding:22px}.sheet{padding:0 22px 22px}.rank{padding:24px}.bars{grid-template-columns:auto minmax(0,1fr) auto}.bars .v{display:none}.d:hover{transform:none}}
+.ov{grid-template-columns:1fr;padding:22px}.ov .chips{justify-content:flex-start}.ovr{gap:10px}.rbtn{padding:9px 14px}.head{--pad:20px}.ban{min-height:150px}.sheet{padding:0 22px 22px}.rank{padding:24px}.bars{grid-template-columns:auto minmax(0,1fr) auto}.bars .v{display:none}.d:hover{transform:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 """)
 
@@ -288,6 +303,11 @@ JS = """
 })();
 """
 
+PHOTO_DIR = ROOT / "assets" / "photos"
+# colour backdrop per destination, used until a photo is added to assets/photos/
+TINTS = {"TYO": ("#3b3f8f", "#141633"), "KIX": ("#9b2c2c", "#3a1010"), "OKA": ("#0f8a8a", "#06343f"),
+         "SEL": ("#36507d", "#141c2e"), "CJU": ("#2f7d4f", "#0f2b1c"), "PUS": ("#1f6fae", "#0b2540")}
+
 FAVICON = ("<link rel='icon' type='image/svg+xml' href=\"data:image/svg+xml,"
            "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231d1d1f'/%3E"
            "%3Cpath fill='%23fff' d='M54 32c0 1.9-1.6 3.4-3.5 3.4H38.2l-10 15.1h-4.9l4.9-15.1H18.3l-4 4.6h-3.5l2.4-8-2.4-8h3.5l4 4.6h9.9L23.3 13.5h4.9l10 15.1h12.3c1.9 0 3.5 1.5 3.5 3.4z'/%3E"
@@ -302,6 +322,22 @@ ICONS = {
 }
 PLUS = ('<span class="plus" aria-hidden="true"><svg viewBox="0 0 14 14"><path d="M7 1v12M1 7h12" fill="none" '
         'stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>')
+
+
+@lru_cache(maxsize=None)
+def _photo(code: str) -> str:
+    """Destination photo as a data URI (assets/photos/<CODE>.webp|jpg), or "" for the gradient fallback."""
+    for ext, mime in (("webp", "image/webp"), ("jpg", "image/jpeg")):
+        path = PHOTO_DIR / f"{code}.{ext}"
+        if path.exists():
+            return f"data:{mime};base64," + base64.b64encode(path.read_bytes()).decode()
+    return ""
+
+
+@lru_cache(maxsize=None)
+def _credits() -> dict:
+    path = PHOTO_DIR / "credits.json"
+    return json.loads(path.read_text()) if path.exists() else {}
 
 
 def _icon(tag: str) -> str:
@@ -489,8 +525,11 @@ def _sheet(r: DestReport, cfg) -> str:
 def _card(r: DestReport, cfg, i: int) -> str:
     n = max(cfg.trip.pax)
     sub = r.dest.airport_label + (" · via Osaka" if r.dest.code == "KIX" else "")
-    ident = (f'<span class="id">{_icon(r.dest.tag)}<span><span class="name">{e(r.dest.name)}</span><br>'
-             f'<span class="where">{e(sub)}</span></span>{PLUS}</span>')
+    img = _photo(r.dest.code)
+    tint = TINTS.get(r.dest.code)
+    style = "".join(x for x in (f"--img:url({img});" if img else "",
+                                f"--tint-bg:linear-gradient(135deg,{tint[0]},{tint[1]});" if tint else ""))
+    style = f' style="{style}"' if style else ""
     badges = [f'<span class="pill">{e(" · ".join(x for x in (r.dest.country, r.dest.tag) if x))}</span>']
     if r.best:
         if r.is_cheapest:
@@ -507,7 +546,8 @@ def _card(r: DestReport, cfg, i: int) -> str:
         trend = (f'<span class="trend">{spark[0]}<span class="lab">{spark[1]}d</span>{_delta(cfg, r)}</span>'
                  if spark else f'<span class="trend">{_delta(cfg, r)}</span>')
         more = len({(x.outbound.flight_number, x.inbound.flight_number) for x in r.options}) - 1
-        body = (f'<span class="pills">{"".join(badges)}</span>'
+        body = (f'<span class="ban"{style}><span><span class="name">{e(r.dest.name)}</span><br>'
+                f'<span class="where">{e(sub)}</span></span><span class="pills">{"".join(badges)}</span></span>'
                 f'<span><span class="tot num{" lo" if r.is_cheapest else ""}">{_m(cfg, r.price)}</span><span class="unit">/ pax</span><br>'
                 f'<span class="per num">Total: {_m(cfg, r.price * n)} for {n}</span></span>{trend}'
                 f'<span class="via">{avatar(q.outbound.airline, q.outbound.flight_number)}<span><b>{e(q.airline)}</b></span>'
@@ -517,10 +557,12 @@ def _card(r: DestReport, cfg, i: int) -> str:
         if r.dest.primary:
             badges.append('<span class="pill solid">Primary pick</span>')
         badges.append(f'<span class="pill unmet" title="{e(why, quote=True)}">{e(label)}</span>')
-        body = (f'<span class="pills">{"".join(badges)}</span><span><span class="tot">No fare</span></span>')
+        body = (f'<span class="ban"{style}><span><span class="name">{e(r.dest.name)}</span><br>'
+                f'<span class="where">{e(sub)}</span></span><span class="pills">{"".join(badges)}</span></span>'
+                f'<span><span class="tot">No fare</span></span>')
     cls = "d glass" + ("" if r.best else " na")
     return (f'<article class="{cls}" style="view-transition-name:card{i}"><button class="head" type="button" '
-            f'aria-expanded="false" aria-controls="s{i}">{ident}{body}</button>'
+            f'aria-expanded="false" aria-controls="s{i}" aria-label="{e(r.dest.name)}">{PLUS}{body}</button>'
             f'<div class="reveal" id="s{i}"><div>{_sheet(r, cfg)}</div></div></article>')
 
 
@@ -600,8 +642,12 @@ def _content(rep: DailyReport | None, cfg: Config) -> str:
     P.append('<section><div class="sech"><h2>Sources</h2><span>✓ priced or operating in today\'s fares</span></div>'
              f'<div class="chips">{chips}</div></section>')
 
+    cr = _credits()
+    credit = " · ".join(
+        f'{e(d.name)}: <a href="{e(c["url"], quote=True)}" target="_blank" rel="noopener">{e(c["author"])}</a>, {e(c["license"])}'
+        for d in cfg.destinations if (c := cr.get(d.code)))
     P.append("<footer>Per adult, round trip, one checked bag. Budget-airline bag fees are estimates. "
-             "Confirm the price when booking.</footer>")
+             "Confirm the price when booking." + (f"<br>Photos via Wikimedia Commons: {credit}" if credit else "") + "</footer>")
     relay = os.environ.get("REFRESH_URL", "")
     return (f'<div class="wrap" data-generated="{rep.fetched_at}" data-refresh="{e(relay, quote=True)}">{"".join(P)}</div>'
             f'<script>{JS}</script>')
