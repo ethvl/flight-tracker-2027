@@ -140,6 +140,14 @@ Without it, the button only reloads a newer daily snapshot. Each fetch uses up
 to 24 SerpAPI searches; `MIN_MINUTES` stops repeated clicks draining the quota.
 Telegram reports are sent only on the 08:00 daily run.
 
+## When fares are fetched
+
+| Trigger | Fetches new fares | Telegram |
+|---|---|---|
+| Daily schedule, 08:00 Singapore | yes | yes |
+| Actions tab "Run workflow" / site Refresh (relay) | yes | no |
+| Code push | no, rebuilds the page from the last fetch | no |
+
 ## API usage
 
 Default settings use up to 4 SerpAPI searches per destination per run

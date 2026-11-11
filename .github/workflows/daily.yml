@@ -39,8 +39,14 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           DASHBOARD_URL: ${{ vars.DASHBOARD_URL }}
           REFRESH_URL: ${{ vars.REFRESH_URL }}
-        # Telegram report only on the daily schedule, not on every refresh or code push
-        run: python -m tracker run ${{ github.event_name == 'schedule' && '--send' || '' }}
+        # Daily schedule: fetch + Telegram. Manual / Refresh runs: fetch only.
+        # Code pushes: rebuild the page from the stored fares (no SerpAPI searches used).
+        run: |
+          case "${{ github.event_name }}" in
+            schedule) python -m tracker run --send ;;
+            push)     python -m tracker report ;;
+            *)        python -m tracker run ;;
+          esac
 
       - name: Save price history back to the repo
         if: always()

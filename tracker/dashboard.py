@@ -430,24 +430,35 @@ def _delta(cfg, r: DestReport, mult: int = 1) -> str:
     return f'<span class="pill up num" title="{tip}">+{amt} today</span>'
 
 
-def sparkline(history, days=14, w=240, h=40, pad=4) -> str:
-    """Area sparkline of the last `days` snapshots; green when lower than at the start, red when higher."""
-    vals = [p for _, p in history][-days:]
-    if len(vals) < 2:
-        return ""
+def sparkline(history, days=14, w=240, h=40, pad=4, symbol="S$"):
+    """Price-history sparkline from (date, cheapest price that day) pairs, oldest first.
+
+    Points sit at their real calendar position, so a day without a fetch leaves a visible gap
+    rather than squeezing the line. A flat history is drawn across the middle. Colour compares
+    the last point with the first: green cheaper, red dearer, grey unchanged.
+    Returns (svg, days covered) or ("", 0) when there are fewer than two days of data."""
+    hist = sorted(history)
+    if hist:
+        hist = [(d, v) for d, v in hist if (hist[-1][0] - d).days < days]
+    if len(hist) < 2:
+        return "", 0
+    first, last = hist[0][0], hist[-1][0]
+    span_days = max(1, (last - first).days)
+    vals = [v for _, v in hist]
     lo, hi = min(vals), max(vals)
-    span = (hi - lo) or 1
-    pts = [(pad + i * (w - 2 * pad) / (len(vals) - 1), h - pad - (v - lo) / span * (h - 2 * pad))
-           for i, v in enumerate(vals)]
-    line = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
+
+    def y(v):
+        return h / 2 if hi - lo < 0.5 else h - pad - (v - lo) / (hi - lo) * (h - 2 * pad)
+    pts = [(pad + (d - first).days / span_days * (w - 2 * pad), y(v)) for d, v in hist]
+    line = " ".join(f"{px:.1f},{py:.1f}" for px, py in pts)
     diff = vals[-1] - vals[0]
     col = "var(--ink2)" if abs(diff) < 0.5 else ("var(--green)" if diff < 0 else "var(--red)")
-    ex, ey = pts[-1]
-    label = f"{len(vals)}-day price trend: {vals[0]:.0f} to {vals[-1]:.0f}, low {lo:.0f}, high {hi:.0f}"
+    points = " · ".join(f"{d:%d %b} {symbol}{v:,.0f}" for d, v in hist)
+    label = f"Cheapest fare per day, {first:%d %b} to {last:%d %b}: {points}"
     return (f'<svg viewBox="0 0 {w} {h}" preserveAspectRatio="none" role="img" aria-label="{label}"><title>{label}</title>'
-            f'<polygon points="{pad},{h} {line} {w - pad},{h}" fill="{col}" fill-opacity=".1"/>'
+            f'<polygon points="{pts[0][0]:.1f},{h} {line} {pts[-1][0]:.1f},{h}" fill="{col}" fill-opacity=".1"/>'
             f'<polyline points="{line}" fill="none" stroke="{col}" stroke-width="1.6" stroke-linecap="round" '
-            f'stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>'), len(vals)
+            f'stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>'), span_days + 1
 
 
 CITY = {"SIN": "Singapore", "NRT": "Tokyo Narita", "HND": "Tokyo Haneda", "KIX": "Osaka Kansai", "OKA": "Okinawa",
@@ -606,8 +617,8 @@ def _card(r: DestReport, cfg, i: int) -> str:
             badges.append(f'<span class="pill save" title="{e(r.deal_reason, quote=True)}">'
                           f'{"Great price" if r.deal == "great" else "Good deal"}</span>')
         q = r.best
-        spark = sparkline(r.history)
-        trend = (f'<span class="trend">{spark[0]}<span class="lab">{spark[1]}d</span>{_delta(cfg, r)}</span>'
+        spark = sparkline(r.history, symbol=cfg.trip.symbol)
+        trend = (f'<span class="trend">{spark[0]}<span class="lab" title="Days of price history">{spark[1]}d</span>{_delta(cfg, r)}</span>'
                  if spark else f'<span class="trend">{_delta(cfg, r)}</span>')
         more = len({(x.outbound.flight_number, x.inbound.flight_number) for x in r.options}) - 1
         body = (f'<span class="ban ph-{r.dest.code}"{style}><span><span class="name">{e(r.dest.name)}</span><br>'

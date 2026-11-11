@@ -7,7 +7,7 @@ from tracker.config import load_config
 from tracker.models import FetchResult, Leg, Quote
 from tracker.providers.base import inbound_ok, outbound_ok
 from tracker.aggregate import coverage, fetch_all, merge
-from tracker.dashboard import render_dashboard
+from tracker.dashboard import render_dashboard, sparkline
 from tracker.report import render_telegram
 from tracker.telegram import split_message
 
@@ -136,3 +136,17 @@ def test_merge_keeps_cheapest_per_seller_and_all_errors_surface():
 def test_empty_state_renders_without_data(tmp_path):
     html = render_dashboard(build_report(CFG, db.connect(tmp_path / "e.db")), CFG)
     assert "No live fares yet" in html
+
+
+def test_sparkline_matches_history():
+    d = date(2026, 11, 10)
+    assert sparkline([(d, 700.0)]) == ("", 0)                         # one day: nothing to draw
+    svg, n = sparkline([(d, 700.0), (d + timedelta(days=1), 650.0)])
+    assert n == 2 and "var(--green)" in svg and "10 Nov S$700" in svg and "11 Nov S$650" in svg
+    svg, n = sparkline([(d, 700.0), (d + timedelta(days=1), 700.0)])
+    assert "var(--ink2)" in svg and ",20.0" in svg                     # flat line drawn mid-height
+    # a missing day keeps its place on the time axis: middle point of 3 days sits at x=120 of 240
+    svg, n = sparkline([(d, 700.0), (d + timedelta(days=1), 720.0), (d + timedelta(days=2), 710.0)])
+    assert "120.0," in svg and n == 3
+    svg, n = sparkline([(d, 700.0), (d + timedelta(days=2), 720.0)])
+    assert n == 3 and "var(--red)" in svg
