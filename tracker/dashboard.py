@@ -6,8 +6,10 @@ expands in place to show airlines, times and booking links -> value ranking.
 from __future__ import annotations
 
 import base64
+import io
 import json
 import os
+import sys
 from datetime import datetime
 from functools import lru_cache
 from html import escape as e
@@ -131,7 +133,7 @@ background:var(--tint,var(--glow1));filter:blur(50px);pointer-events:none}
 .head{all:unset;box-sizing:border-box;display:flex;flex-direction:column;gap:18px;width:100%;--pad:24px;padding:var(--pad);cursor:pointer;border-radius:24px}
 .d{overflow:hidden}
 /* photo banner with legible overlay text */
-.ban{position:relative;display:flex;flex-direction:column;justify-content:flex-end;gap:10px;min-height:168px;margin:calc(-1*var(--pad)) calc(-1*var(--pad)) 0;
+.ban{position:relative;display:flex;flex-direction:column;justify-content:flex-end;gap:10px;min-height:200px;margin:calc(-1*var(--pad)) calc(-1*var(--pad)) 0;
 padding:20px var(--pad) 16px;color:#fff;background-color:#2c3440;background-image:var(--img),var(--tint-bg,linear-gradient(135deg,#46566e,#1d232c));background-size:cover;background-position:center}
 .ban::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05) 0%,rgba(0,0,0,.18) 40%,rgba(0,0,0,.72) 100%)}
 .ban>*{position:relative}
@@ -142,6 +144,7 @@ padding:20px var(--pad) 16px;color:#fff;background-color:#2c3440;background-imag
 .ban .pill.save{color:#052e12;background:#5fe08a;border-color:transparent}
 .ban .pill.unmet{color:#fff;background:rgba(0,0,0,.25);border-color:rgba(255,255,255,.45)}
 .d.na .ban{filter:grayscale(.9) brightness(.9)}
+.d.na .ban .name{color:#fff}
 .d:hover .ban{background-size:cover}
 .head:focus-visible{outline:2px solid var(--ink);outline-offset:-4px}
 .id{display:flex;align-items:center;gap:14px}
@@ -304,6 +307,7 @@ JS = """
 """
 
 PHOTO_DIR = ROOT / "assets" / "photos"
+PHOTO_WIDTH = 1200          # px; banners are at most ~600px wide, so this is sharp on 2x screens
 # colour backdrop per destination, used until a photo is added to assets/photos/
 TINTS = {"TYO": ("#3b3f8f", "#141633"), "KIX": ("#9b2c2c", "#3a1010"), "OKA": ("#0f8a8a", "#06343f"),
          "SEL": ("#36507d", "#141c2e"), "CJU": ("#2f7d4f", "#0f2b1c"), "PUS": ("#1f6fae", "#0b2540")}
@@ -326,12 +330,25 @@ PLUS = ('<span class="plus" aria-hidden="true"><svg viewBox="0 0 14 14"><path d=
 
 @lru_cache(maxsize=None)
 def _photo(code: str) -> str:
-    """Destination photo as a data URI (assets/photos/<CODE>.webp|jpg), or "" for the gradient fallback."""
-    for ext, mime in (("webp", "image/webp"), ("jpg", "image/jpeg")):
-        path = PHOTO_DIR / f"{code}.{ext}"
-        if path.exists():
-            return f"data:{mime};base64," + base64.b64encode(path.read_bytes()).decode()
-    return ""
+    """Destination photo as a small data URI, or "" for the colour backdrop.
+
+    Any size of .jpg/.jpeg/.png/.webp in assets/photos/<CODE>.* is accepted; it is scaled down to
+    PHOTO_WIDTH and re-encoded as WebP so the page stays light (originals can be many MB)."""
+    path = next((PHOTO_DIR / f"{code}.{x}" for x in ("webp", "jpg", "jpeg", "png", "JPG", "JPEG", "PNG")
+                 if (PHOTO_DIR / f"{code}.{x}").exists()), None)
+    if path is None:
+        return ""
+    try:
+        from PIL import Image, ImageOps
+        im = ImageOps.exif_transpose(Image.open(path)).convert("RGB")
+        if im.width > PHOTO_WIDTH:
+            im = im.resize((PHOTO_WIDTH, round(im.height * PHOTO_WIDTH / im.width)), Image.LANCZOS)
+        buf = io.BytesIO()
+        im.save(buf, "WEBP", quality=72, method=6)
+        return "data:image/webp;base64," + base64.b64encode(buf.getvalue()).decode()
+    except Exception as err:                       # a broken file must not break the page
+        print(f"photo {path.name} skipped: {err}", file=sys.stderr)
+        return ""
 
 
 @lru_cache(maxsize=None)
