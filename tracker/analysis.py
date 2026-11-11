@@ -30,6 +30,8 @@ class DestReport:
     is_cheapest: bool = False
     value_rank: int | None = None
     tier: str = ""                      # value tier css class, set by the dashboard
+    price_rank: int = 0                 # 1 = cheapest priced destination today
+    ranked: int = 0
 
     @property
     def best(self) -> Quote | None:

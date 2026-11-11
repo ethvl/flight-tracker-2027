@@ -165,11 +165,15 @@ padding:20px var(--pad) 16px;color:#fff;background-color:#2c3440;background-imag
 .where{font-size:.82rem;color:var(--muted);font-weight:400}
 .plus{position:absolute;top:14px;right:14px;z-index:3;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:rgba(0,0,0,.38);color:#fff;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:transform .45s var(--ease),background-color .2s}
 .plus svg{width:14px;height:14px}
-.head:hover .plus{background:rgba(0,0,0,.58)}
+.head:hover .plus{background:rgba(0,0,0,.6)}
 .plus:active{transform:scale(.9)}
-.open .plus{left:14px;right:auto;width:36px;height:36px;transform:rotate(45deg);background:rgba(0,0,0,.5)}
-.open .head:hover .plus{background:rgba(0,0,0,.72);transform:rotate(45deg) scale(1.06)}
-.open .ban{padding-top:58px}
+.open .plus{top:16px;right:16px;width:40px;height:40px;transform:rotate(45deg);background:rgba(0,0,0,.6);
+box-shadow:0 0 0 1px rgba(255,255,255,.25),0 6px 18px rgba(0,0,0,.25)}
+.open .plus svg{width:16px;height:16px}
+.open .head:hover .plus,.open .plus:hover{background:rgba(0,0,0,.8)}
+/* expanded card: left column = photo + price only; everything else lives in the right column */
+.d.open .head .trend,.d.open .head .via{display:none}
+.facts .up b{color:var(--red)}.facts .down b{color:var(--green)}
 .price{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
 .tot{font-size:2.6rem;font-weight:700;letter-spacing:-.04em;line-height:1}
 .per{font-size:.9rem;color:var(--ink2);margin-top:8px;font-weight:400}
@@ -225,7 +229,7 @@ background:var(--btn);color:var(--btn-ink);transition:transform .2s var(--ease),
 /* open card: full row; summary column left (sticky), flights right; close button pinned top-right */
 @media (min-width:641px){.d.open{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,320px) minmax(0,1fr);align-items:start}
 
-.d.open .sheet{padding:24px 64px 28px 8px}.d.open .sheet>hr:first-child{display:none}
+.d.open .sheet{padding:72px 28px 28px 8px}.d.open .sheet>hr:first-child{display:none}
 .d.open .facts{grid-template-columns:repeat(4,minmax(0,1fr))}.d.open .opts{grid-template-columns:1fr}}
 @media (min-width:900px){.d.open .opt{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px 20px;align-items:start}
 .d.open .opt>.hd,.d.open .opt>.sel,.d.open .opt>.acts{grid-column:1/-1}}
@@ -535,12 +539,15 @@ def _sheet(r: DestReport, cfg) -> str:
         _, why = _unmet(r, cfg)
         return (f'<div class="sheet"><hr><div class="viaNote">{e(why)}</div>'
                 f'{_book(_prefilled(cfg, r.dest.airports[0]), n)}</div>')
-    facts = []
+    facts = [("Price Ranking", f"#{r.price_rank} of {r.ranked}")]
+    if r.delta is not None and abs(r.delta) >= 0.5:
+        facts.append(("vs. yesterday", f"{'−' if r.delta < 0 else '+'}{_m(cfg, abs(r.delta))}"))
     if r.hist_median is not None:
-        facts += [("Typical", _m(cfg, r.hist_median)), ("Lowest", _m(cfg, min(r.hist_min, r.price)))]
-    facts += [("All-in / pax", _m(cfg, r.trip_cost)), ("Value", f"{r.value_score:.1f}")]
-    fh = "".join(f'<div class="{"vt " + r.tier if k == "Value" else ""}"><b class="num">{e(v)}</b>{e(k)}</div>'
-                 for k, v in facts)
+        facts += [("Typical", _m(cfg, r.hist_median)), ("Lowest tracked", _m(cfg, min(r.hist_min, r.price)))]
+    if len(facts) < 4:
+        facts.append(("Est. all-in / pax", _m(cfg, r.trip_cost)))
+    cls = lambda k: ("down" if r.delta < 0 else "up") if k == "vs. yesterday" else ""
+    fh = "".join(f'<div class="{cls(k)}"><b class="num">{e(v)}</b>{e(k)}</div>' for k, v in facts)
     lowest = min(q.total_per_pax for q in r.options)
     groups: dict[tuple, list] = {}
     for q in r.options:                                   # one block per itinerary, its sellers listed inside
@@ -562,8 +569,9 @@ def _sheet(r: DestReport, cfg) -> str:
             f'<div class="opt"><div class="hd"><span class="who">{avatar(q.outbound.airline, q.outbound.flight_number, "lg")}'
             f'<span><b>{e(q.airline)}</b>{' <span class="pill rec">Recommended</span>' if gi == 0 else ""}'
             f'<br><span class="fl">{e(bag)}</span></span></span>'
-            f'<span class="num{" lo" if q.total_per_pax <= lowest else ""}">{_m(cfg, q.total_per_pax)} <small>/ pax</small><br>'
-            f'<small>{_m(cfg, q.total_per_pax * n)} for {n}</small></span></div>'
+            + ("" if gi == 0 else                       # the recommended option's price is the hero price on the left
+               f'<span class="num">{_m(cfg, q.total_per_pax)} <small>/ pax</small><br>'
+               f'<small>{_m(cfg, q.total_per_pax * n)} for {n}</small></span>') + '</div>'
             f'{_route("Departure", q.outbound, cfg)}{_route("Return", q.inbound, cfg)}{sellers}{_book(links, n)}</div>')
     return f'<div class="sheet"><hr><div class="facts">{fh}</div><div class="opts">{"".join(opts)}</div></div>'
 
@@ -656,6 +664,8 @@ def _content(rep: DailyReport | None, cfg: Config) -> str:
                  'Prices appear here after the first fetch.</p></div>')
         return f'<div class="wrap" data-generated="">{"".join(P)}</div><script>{JS}</script>'
 
+    for i, r in enumerate(sorted(rep.priced, key=lambda r: r.price), 1):
+        r.price_rank, r.ranked = i, len(rep.priced)
     if rep.priced:
         top = max(r.value_score for r in rep.priced)
         for r in rep.priced:                          # value tier relative to the best score today
