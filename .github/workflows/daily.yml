@@ -30,6 +30,7 @@ jobs:
 
       - name: Fetch prices, send Telegram report, build dashboard
         env:
+          TZ: Asia/Singapore        # timestamps on the page and in Telegram are Singapore time
           SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
