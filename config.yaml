@@ -1,0 +1,103 @@
+# ---------------------------------------------------------------------------
+# Trip definition
+# ---------------------------------------------------------------------------
+trip:
+  origin: SIN
+  depart_date: 2027-05-10
+  return_date: 2027-05-16
+  outbound_arrive_by: "15:00"   # local time at destination, on depart_date
+  return_arrive_by: "15:00"     # local time in Singapore, on return_date
+  pax: [1, 4]
+  currency: SGD
+  symbol: "S$"
+
+# ---------------------------------------------------------------------------
+# Destinations. Add / remove freely - everything else adapts.
+#   airports          : every airport searched for this destination (non-stop from origin)
+#   google/kayak/skyscanner : how the destination is named in booking-link searches
+#                       (default: first airport code)
+#   primary           : true = show a "Primary pick" badge
+#   experience_score  : your own 1-10 rating of the trip (subjective - edit!)
+#   daily_ground_cost : rough SGD per person per day (hotel share, food, transport)
+# The last two only drive the "best value" ranking, never the fare itself.
+# ---------------------------------------------------------------------------
+destinations:
+  - {code: TYO, name: Tokyo,   country: Japan, tag: Hub, airports: [NRT, HND], google: Tokyo, kayak: TYO, skyscanner: tyoa,
+     experience_score: 9.0, daily_ground_cost: 200}
+  - {code: KIX, name: Kyoto,   country: Japan, tag: Cultural, airports: [KIX], note: "via Osaka Kansai (KIX), about 75 min by train",
+     experience_score: 9.0, daily_ground_cost: 180}
+  - {code: OKA, name: Okinawa, country: Japan, tag: Island, airports: [OKA], primary: true,
+     experience_score: 8.5, daily_ground_cost: 150}
+  - {code: SEL, name: Seoul,   country: South Korea, tag: Hub, airports: [ICN, GMP], google: Seoul, kayak: SEL, skyscanner: sela,
+     experience_score: 8.5, daily_ground_cost: 140}
+  - {code: CJU, name: Jeju Island, country: South Korea, tag: Island, airports: [CJU],
+     experience_score: 8.0, daily_ground_cost: 130}
+  - {code: PUS, name: Busan,   country: South Korea, tag: Coastal, airports: [PUS], primary: true,
+     experience_score: 8.0, daily_ground_cost: 120}
+
+# ---------------------------------------------------------------------------
+# Data provider
+# ---------------------------------------------------------------------------
+provider:
+  max_return_lookups: 2      # per destination: how many outbound options to price a return for
+  options_per_destination: 4 # how many qualifying offers to keep / show
+  seller_prices: 1           # per destination: itineraries to break down by seller (airline vs travel agencies); 0 = off
+  concurrency: 3             # destinations fetched in parallel per source
+  timeout_seconds: 180       # per destination, per source
+
+# ---------------------------------------------------------------------------
+# Checked baggage.
+# Google Flights cannot filter on *checked* bags, so each fare is normalised:
+#   - carriers under `included` sell economy fares with a checked bag -> no add-on
+#   - carriers under `addon` get the round-trip per-person fee added (~20kg)
+#   - unknown carriers get `default_addon` and a "verify baggage" flag
+# Fees are estimates in trip currency. Adjust to the bundle you'd actually buy.
+# ---------------------------------------------------------------------------
+baggage:
+  default_addon: 80
+  included:
+    - Singapore Airlines
+    - Thai Airways
+    - Malaysia Airlines
+    - Garuda Indonesia
+    - Vietnam Airlines
+    - Korean Air
+    - Asiana
+    - ANA
+    - Japan Airlines
+    - JAL
+    - Bangkok Airways
+    - Batik Air
+    - KLM
+    - Emirates
+    - Ethiopian
+  addon:
+    Scoot: 70
+    AirAsia: 60
+    Jetstar: 70
+    VietJet: 60
+    Vietjet: 60
+    Jeju Air: 80
+    "T'way": 80
+    Air Busan: 80
+    Jin Air: 80
+    Peach: 80
+    Zipair: 90
+    Lion: 50
+    Citilink: 50
+    TransNusa: 50
+    Firefly: 40
+
+# ---------------------------------------------------------------------------
+# Deal tagging (compared with this destination's own tracked history)
+# ---------------------------------------------------------------------------
+deals:
+  min_history_days: 3
+  good_pct_below_median: 5
+  great_pct_below_median: 12
+
+schedule:
+  timezone: Asia/Singapore
+  time: "08:00"
+
+database: data/prices.db
