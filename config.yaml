@@ -5,8 +5,8 @@ trip:
   origin: SIN
   depart_date: 2027-05-10
   return_date: 2027-05-16
-  outbound_arrive_by: "15:00"   # local time at destination, on depart_date
-  return_arrive_by: "15:00"     # local time in Singapore, on return_date
+  outbound_arrive_by: "20:00"   # local time at destination, on depart_date
+  return_arrive_by: "20:00"     # local time in Singapore, on return_date
   pax: [1, 4]
   currency: SGD
   symbol: "S$"

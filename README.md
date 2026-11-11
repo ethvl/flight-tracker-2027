@@ -11,8 +11,8 @@ dashboard.
 1. Queries every configured live source for all six destinations concurrently
    (non-stop, round trip). There is no demo or sample data anywhere in the app:
    with no source configured the dashboard shows "No live fares yet".
-2. Keeps only itineraries that land at the destination by 15:00 on 10 May and
-   back in Singapore by 15:00 on 16 May (exact check in code, local times).
+2. Keeps only itineraries that land at the destination by 20:00 on 10 May and
+   back in Singapore by 20:00 on 16 May (exact check in code, local times).
 3. For the cheapest itinerary per destination, pulls the price each seller
    quotes for it (the airline itself, Trip.com and other agencies).
 4. Normalises every fare to include one checked bag (see "Baggage" below).
@@ -118,6 +118,27 @@ fetch (`POST /api/refresh`) and reloads with the new prices. On a static host
 
 **Theme.** Light by default on every device; the sun/moon toggle switches to
 dark and remembers the choice in that browser.
+
+## Refresh Fares on the GitHub Pages site (optional)
+
+The site is static, so its Refresh button needs a small relay to start a real
+fetch. `relay/refresh-worker.js` is a Cloudflare Worker (free plan) that starts
+this repository's workflow; the page then waits about 2 minutes for the new
+snapshot and reloads.
+
+1. Create a fine-grained GitHub token: this repository only, permission
+   "Actions: Read and write".
+2. In Cloudflare: Workers & Pages -> Create -> Worker, paste
+   `relay/refresh-worker.js`, deploy.
+3. In the Worker's Settings -> Variables and secrets add `GITHUB_TOKEN`
+   (secret), `REPO` = `ethvl/flight-tracker-2027`, `WORKFLOW` = `daily.yml`,
+   `ALLOWED_ORIGIN` = `https://ethvl.github.io`, `MIN_MINUTES` = `15`.
+4. In this repository: Settings -> Secrets and variables -> Actions ->
+   Variables -> add `REFRESH_URL` = the Worker's URL.
+
+Without it, the button only reloads a newer daily snapshot. Each fetch uses up
+to 24 SerpAPI searches; `MIN_MINUTES` stops repeated clicks draining the quota.
+Telegram reports are sent only on the 08:00 daily run.
 
 ## API usage
 

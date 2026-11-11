@@ -3,7 +3,10 @@ name: Daily flight price update
 on:
   schedule:
     - cron: "0 0 * * *"      # 00:00 UTC = 08:00 Singapore
-  workflow_dispatch:
+  workflow_dispatch:          # the Actions tab button, and the site's Refresh Fares (via relay/)
+  push:                       # redeploy when the code changes
+    branches: [main]
+    paths-ignore: ["data/**", "**.md", "relay/**"]
 
 permissions:
   contents: write
@@ -35,7 +38,9 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           DASHBOARD_URL: ${{ vars.DASHBOARD_URL }}
-        run: python -m tracker run --send
+          REFRESH_URL: ${{ vars.REFRESH_URL }}
+        # Telegram report only on the daily schedule, not on every refresh or code push
+        run: python -m tracker run ${{ github.event_name == 'schedule' && '--send' || '' }}
 
       - name: Save price history back to the repo
         if: always()

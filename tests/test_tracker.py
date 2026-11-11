@@ -28,13 +28,17 @@ def quote(dest, fare, airline="Singapore Airlines"):
 
 
 def test_timing_cutoffs():
-    assert outbound_ok(leg("2027-05-10T08:00", "2027-05-10T15:00"), T)
-    assert not outbound_ok(leg("2027-05-10T08:00", "2027-05-10T15:01"), T)
+    cut = T.outbound_arrive_by.strftime("%H:%M")
+    over = (datetime.combine(T.depart_date, T.outbound_arrive_by) + timedelta(minutes=1)).strftime("%H:%M")
+    assert outbound_ok(leg("2027-05-10T08:00", f"2027-05-10T{cut}"), T)
+    assert not outbound_ok(leg("2027-05-10T08:00", f"2027-05-10T{over}"), T)
     assert not outbound_ok(leg("2027-05-10T23:00", "2027-05-11T05:00"), T)   # lands next day
     assert not outbound_ok(leg("2027-05-09T23:00", "2027-05-10T05:00"), T)   # leaves a day early
     assert inbound_ok(leg("2027-05-16T01:00", "2027-05-16T06:00"), T)
     assert inbound_ok(leg("2027-05-15T23:30", "2027-05-16T05:00"), T)        # overnight is fine
-    assert not inbound_ok(leg("2027-05-16T12:00", "2027-05-16T17:00"), T)
+    rcut = datetime.combine(T.return_date, T.return_arrive_by)
+    assert inbound_ok(leg("2027-05-16T12:00", rcut.isoformat()), T)
+    assert not inbound_ok(leg("2027-05-16T12:00", (rcut + timedelta(minutes=1)).isoformat()), T)
 
 
 def test_baggage_normalisation():

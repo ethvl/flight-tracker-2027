@@ -29,6 +29,7 @@ class DestReport:
     value_score: float | None = None
     is_cheapest: bool = False
     value_rank: int | None = None
+    tier: str = ""                      # value tier css class, set by the dashboard
 
     @property
     def best(self) -> Quote | None:

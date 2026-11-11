@@ -5,13 +5,14 @@ expands in place to show airlines, times and booking links -> value ranking.
 """
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from html import escape as e
 
 from .aggregate import coverage
 from .analysis import DailyReport, DestReport
 from .config import Config
-from .links import build_links
+from .links import airline_site, build_links, google_flights, kayak, skyscanner
 from .logos import avatar
 
 FONTS = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800'
@@ -21,10 +22,10 @@ FONTS = ('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=
 DARK = ("--bg:#0a0a0c;--glow1:rgba(120,140,255,.10);--glow2:rgba(255,255,255,.05);--card:rgba(255,255,255,.045);"
         "--card-hi:rgba(255,255,255,.075);--inset:rgba(255,255,255,.04);--line:rgba(255,255,255,.08);"
         "--line-hi:rgba(255,255,255,.2);--ink:#f5f5f7;--ink2:#a1a1a6;--muted:#6e6e73;--green:#30d158;"
-        "--green-bg:rgba(48,209,88,.14);--red:#ff6961;--red-bg:rgba(255,105,97,.13);--btn:#f5f5f7;--btn-ink:#000;--ambient:0 30px 80px -40px rgba(120,140,255,.25)")
+        "--green-bg:rgba(48,209,88,.14);--red:#ff6961;--red-bg:rgba(255,105,97,.13);--amber:#ffd60a;--orange:#ff9f0a;--btn:#f5f5f7;--btn-ink:#000;--ambient:0 30px 80px -40px rgba(120,140,255,.25)")
 LIGHT = ("--bg:#f5f5f7;--glow1:rgba(255,255,255,.9);--glow2:rgba(255,255,255,0);--card:#fff;--card-hi:#fff;"
          "--inset:#f5f5f7;--line:rgba(0,0,0,.08);--line-hi:rgba(0,0,0,.2);--ink:#1d1d1f;--ink2:#6e6e73;--muted:#86868b;"
-         "--green:#1a7f37;--green-bg:rgba(26,127,55,.1);--red:#c9342c;--red-bg:rgba(201,52,44,.09);--btn:#1d1d1f;--btn-ink:#fff;"
+         "--green:#1a7f37;--green-bg:rgba(26,127,55,.1);--red:#c9342c;--red-bg:rgba(201,52,44,.09);--amber:#a86e00;--orange:#c4500c;--btn:#1d1d1f;--btn-ink:#fff;"
          "--ambient:0 30px 60px -40px rgba(0,0,0,.25)")
 
 CSS = (":root{" + LIGHT + ";color-scheme:light;"
@@ -118,8 +119,8 @@ background:var(--tint,var(--glow1));filter:blur(50px);pointer-events:none}
 .unit{white-space:nowrap;font-size:.85rem;font-weight:400;letter-spacing:0;color:var(--muted);margin-left:6px}
 .s .cap{color:var(--ink2);font-size:.9rem;position:relative}
 /* destination cards */
-.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;align-items:start}
-.d{min-width:0;transition:transform .3s ease-out,border-color .3s ease-out,background-color .3s ease-out}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-flow:row dense;gap:20px;align-items:start}
+.d{position:relative;min-width:0;transition:transform .3s ease-out,border-color .3s ease-out,background-color .3s ease-out}
 .d:hover{transform:scale(1.01);border-color:var(--line-hi);background:var(--card-hi)}
 .d.open{transform:none;border-color:var(--line-hi);background:var(--card-hi)}
 .d.na{box-shadow:none}
@@ -187,9 +188,24 @@ background:var(--btn);color:var(--btn-ink);transition:transform .2s var(--ease),
 .alt:hover{color:var(--ink)}
 .opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px 32px}
 .opts .opt{padding-top:20px;border-top:1px solid var(--line)}
-/* open card takes the full row: summary left, sheet right */
-@media (min-width:641px){.d.open{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr)}
-.d.open .sheet{padding:24px 24px 24px 8px}.d.open .sheet>hr:first-child{display:none}.d.open .facts{grid-template-columns:repeat(4,minmax(0,1fr))}}
+/* open card: full row; summary column left (sticky), flights right; close button pinned top-right */
+.d.open .plus{position:absolute;top:18px;right:18px;margin:0;z-index:2}
+.d.open .head{padding-right:64px}
+@media (min-width:641px){.d.open{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,320px) minmax(0,1fr);align-items:start}
+.d.open .head{position:sticky;top:12px;padding-right:24px}
+.d.open .sheet{padding:24px 64px 28px 8px}.d.open .sheet>hr:first-child{display:none}
+.d.open .facts{grid-template-columns:repeat(4,minmax(0,1fr))}.d.open .opts{grid-template-columns:1fr}}
+@media (min-width:900px){.d.open .opt{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px 20px;align-items:start}
+.d.open .opt>.hd,.d.open .opt>.sel,.d.open .opt>.acts{grid-column:1/-1}}
+.sel{display:flex;flex-direction:column;gap:8px}
+/* price + value colour coding */
+.tot.lo,.big.lo,.opt .hd .num.lo{color:var(--green)}
+.tier-hi{--tier:var(--green)}.tier-mid{--tier:var(--amber)}.tier-lo{--tier:var(--orange)}
+.bars .sc{font-weight:700;color:var(--tier)}
+.bars .track i{background:var(--tier)}
+.facts .vt b{color:var(--tier)}
+.legend{display:inline-flex;gap:12px;flex-wrap:wrap}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--tier);margin-right:5px;vertical-align:1px}
 ::view-transition-group(*){animation-duration:.5s;animation-timing-function:cubic-bezier(.32,.72,0,1)}
 .vt .reveal,.vt .sheet{transition:none}
 /* ranking */
@@ -198,7 +214,7 @@ background:var(--btn);color:var(--btn-ink);transition:transform .2s var(--ease),
 .bars{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:14px 18px;align-items:center}
 .bars .n{font-weight:500}.bars .v{color:var(--muted);font-size:.85rem;text-align:right}
 .track{height:4px;border-radius:2px;background:var(--line)}
-.track i{display:block;height:100%;border-radius:2px;background:var(--ink)}
+.track i{display:block;height:100%;border-radius:2px}
 footer{color:var(--muted);font-size:.78rem;max-width:80ch;line-height:1.6}
 @media (max-width:1000px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.spot{grid-template-columns:1fr}.s{padding:28px}}
 @media (max-width:640px){.wrap{gap:48px;padding-block:36px 64px}.grid{grid-template-columns:1fr;gap:14px}.spot{gap:14px}
@@ -229,25 +245,53 @@ JS = """
   tb.addEventListener('click',function(){var t=root.getAttribute('data-theme')==='dark'?'light':'dark';setTheme(t);
     try{localStorage.setItem('ft-theme',t)}catch(e){}});
 
-  /* refresh: ask the server for a new fetch if there is one, otherwise check for a newer published snapshot */
+  /* Refresh: start a real fetch, then wait for the newer snapshot and reload.
+     - on the static site: via the relay in data-refresh (starts the GitHub workflow)
+     - under `python -m tracker serve`: via api/refresh on the same server
+     - with neither: just look for a newer published snapshot */
   var rb=document.getElementById('refresh'),stamp=document.getElementById('stamp'),wrap=document.querySelector('.wrap');
-  function hhmm(){return new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}
+  var relay=wrap.getAttribute('data-refresh')||'',gen=wrap.getAttribute('data-generated')||'',base=stamp.textContent;
+  function hhmm(d){return (d||new Date()).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}
+  function busy(on){rb.disabled=on;rb.classList.toggle('spin',on);wrap.classList.toggle('loading',on)}
+  function finish(msg){busy(false);stamp.textContent=msg}
+  function latest(){return fetch('latest.json?t='+Date.now(),{cache:'no-store'}).then(function(r){if(!r.ok)throw 0;return r.json()})}
+  function waitForNew(limitMs){
+    var t0=Date.now();
+    (function tick(){
+      var s=Math.round((Date.now()-t0)/1000);
+      stamp.textContent='Fetching live fares… '+Math.floor(s/60)+':'+('0'+s%60).slice(-2);
+      latest().then(function(j){
+        if(j.generated&&j.generated>gen){location.reload();return}
+        if(Date.now()-t0>limitMs){finish('Still fetching · check again in a minute');return}
+        setTimeout(tick,8000);
+      },function(){setTimeout(tick,8000)});
+    })();
+  }
   rb.addEventListener('click',function(){
     if(rb.disabled)return;
-    rb.disabled=true;rb.classList.add('spin');wrap.classList.add('loading');
-    var t0=Date.now(),gen=wrap.getAttribute('data-generated');
-    function done(msg,reload){setTimeout(function(){
-      if(reload){location.reload();return}
-      wrap.classList.remove('loading');rb.classList.remove('spin');rb.disabled=false;stamp.textContent=msg;
-    },Math.max(0,900-(Date.now()-t0)))}
-    function snapshot(){return fetch('latest.json',{cache:'no-store'}).then(function(r){if(!r.ok)throw 0;return r.json()})
-      .then(function(j){if(j.generated&&j.generated>gen)done('',true);else done('Up to date · checked '+hhmm())})}
-    fetch('api/refresh',{method:'POST'}).then(function(r){if(!r.ok)throw 0;return r.json()})
-      .then(function(){done('',true)},function(){return snapshot()})
-      .catch(function(){done('Could not check · '+hhmm())});
+    busy(true);
+    if(relay){
+      fetch(relay,{method:'POST'}).then(function(r){return r.json()}).then(function(j){
+        if(j.status==='started'||j.status==='running'){waitForNew(9*60000);return}
+        if(j.status==='fresh'){
+          return latest().then(function(k){if(k.generated&&k.generated>gen){location.reload();return}
+            finish('Fetched '+(j.next_allowed?'recently · next refresh after '+hhmm(new Date(j.next_allowed)):'recently'))});
+        }
+        finish('Refresh unavailable · '+base);
+      }).catch(function(){finish('Refresh unavailable · '+base)});
+      return;
+    }
+    fetch('api/refresh',{method:'POST'}).then(function(r){if(!r.ok)throw 0;location.reload()})
+      .catch(function(){latest().then(function(j){if(j.generated&&j.generated>gen)location.reload();
+        else finish('Up to date · checked '+hhmm())}).catch(function(){finish('Could not check · '+hhmm())})});
   });
 })();
 """
+
+FAVICON = ("<link rel='icon' type='image/svg+xml' href=\"data:image/svg+xml,"
+           "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231d1d1f'/%3E"
+           "%3Cpath fill='%23fff' d='M54 32c0 1.9-1.6 3.4-3.5 3.4H38.2l-10 15.1h-4.9l4.9-15.1H18.3l-4 4.6h-3.5l2.4-8-2.4-8h3.5l4 4.6h9.9L23.3 13.5h4.9l10 15.1h12.3c1.9 0 3.5 1.5 3.5 3.4z'/%3E"
+           "%3C/svg%3E\">")
 
 ICONS = {
     "hub": "M3 20h18M5 20V9l5-3v14M10 20V4l6 3v13M16 20v-8l4 2v6",
@@ -336,6 +380,30 @@ def _unmet(r: DestReport, cfg) -> tuple[str, str]:
     return "Constraint unmet: no direct flight", "No direct flight on these dates."
 
 
+def _prefilled(cfg, code: str, airlines=()) -> dict:
+    """Search links pre-filled with origin, this airport, exact dates, the group size and non-stop only."""
+    t, n = cfg.trip, max(cfg.trip.pax)
+    links = {f"Google Flights ({n} pax)": google_flights(t.origin, code, t.depart_date, t.return_date, n),
+             f"Skyscanner ({n} pax)": skyscanner(t.origin, code.lower(), t.depart_date, t.return_date, n),
+             f"Kayak ({n} pax)": kayak(t.origin, code, t.depart_date, t.return_date, n)}
+    for a in dict.fromkeys(airlines):
+        if airline_site(a):
+            links[a] = airline_site(a)
+    return links
+
+
+def _book(links: dict, n: int) -> str:
+    """Primary button opens the pre-filled Google Flights search; the rest are secondary links."""
+    items = list(links.items())
+    (_, url), rest = items[0], items[1:]
+    out = [f'<a class="book" href="{e(url, quote=True)}" target="_blank" rel="noopener" '
+           f'title="Google Flights, pre-filled for {n} passengers, non-stop">Book for {n} <span class="arr" aria-hidden="true">→</span></a>']
+    for k, v in rest:
+        short = k.split(" (")[0] if "(" in k else f"{k} site"
+        out.append(f'<a class="alt" href="{e(v, quote=True)}" target="_blank" rel="noopener">{e(short)}</a>')
+    return f'<div class="acts">{"".join(out)}</div>'
+
+
 def _actions(links: dict) -> str:
     agg = ("Google Flights", "Skyscanner", "Kayak")
     own = [(k, v) for k, v in links.items() if not k.startswith(agg)]
@@ -385,12 +453,14 @@ def _sheet(r: DestReport, cfg) -> str:
     if not r.best:
         _, why = _unmet(r, cfg)
         return (f'<div class="sheet"><hr><div class="viaNote">{e(why)}</div>'
-                f'{_actions(build_links(cfg.trip, r.dest, []))}</div>')
+                f'{_book(_prefilled(cfg, r.dest.airports[0]), n)}</div>')
     facts = []
     if r.hist_median is not None:
         facts += [("Typical", _m(cfg, r.hist_median)), ("Lowest", _m(cfg, min(r.hist_min, r.price)))]
     facts += [("All-in / pax", _m(cfg, r.trip_cost)), ("Value", f"{r.value_score:.1f}")]
-    fh = "".join(f'<div><b class="num">{e(v)}</b>{e(k)}</div>' for k, v in facts)
+    fh = "".join(f'<div class="{"vt " + r.tier if k == "Value" else ""}"><b class="num">{e(v)}</b>{e(k)}</div>'
+                 for k, v in facts)
+    lowest = min(q.total_per_pax for q in r.options)
     groups: dict[tuple, list] = {}
     for q in r.options:                                   # one block per itinerary, its sellers listed inside
         groups.setdefault((q.outbound.flight_number, q.inbound.flight_number), []).append(q)
@@ -399,24 +469,20 @@ def _sheet(r: DestReport, cfg) -> str:
         q = qs[0]                                         # cheapest seller for this itinerary
         bag = "Bag included" if q.bag_included else f"Incl. {_m(cfg, q.bag_fee_per_pax)} bag (est.)"
         named = [x for x in qs if x.seller and x.seller != "Google Flights"]
-        direct = next((x for x in named if _same(x.seller, x.airline) and x.booking_url), None)
-        links = dict(q.links)
-        if direct:                                        # the airline's own deep link beats its home page
-            links = {q.outbound.airline: direct.booking_url,
-                     **{k: v for k, v in links.items() if k.startswith(("Google Flights", "Skyscanner", "Kayak"))}}
+        links = _prefilled(cfg, q.outbound.arrive_airport, [q.outbound.airline, q.inbound.airline])
         sellers = ""
         if named:
             rows = "".join(
                 f'<span>{e(x.seller)}</span><span class="sp num">{_m(cfg, x.total_per_pax)}</span>'
                 + (f'<a class="alt" href="{e(x.booking_url, quote=True)}" target="_blank" rel="noopener">Book</a>'
                    if x.booking_url else "<span></span>") for x in named)
-            sellers = f'<div class="legname"><span>Sellers · per pax</span></div><div class="sellers">{rows}</div>'
+            sellers = f'<div class="sel"><div class="legname"><span>Sellers · per pax</span></div><div class="sellers">{rows}</div></div>'
         opts.append(
             f'<div class="opt"><div class="hd"><span class="who">{avatar(q.outbound.airline, q.outbound.flight_number, "lg")}'
             f'<span><b>{e(q.airline)}</b><br><span class="fl">{e(bag)}</span></span></span>'
-            f'<span class="num">{_m(cfg, q.total_per_pax)} <small>/ pax</small><br>'
+            f'<span class="num{" lo" if q.total_per_pax <= lowest else ""}">{_m(cfg, q.total_per_pax)} <small>/ pax</small><br>'
             f'<small>{_m(cfg, q.total_per_pax * n)} for {n}</small></span></div>'
-            f'{_route("Outbound", q.outbound, cfg)}{_route("Return", q.inbound, cfg)}{sellers}{_actions(links)}</div>')
+            f'{_route("Outbound", q.outbound, cfg)}{_route("Return", q.inbound, cfg)}{sellers}{_book(links, n)}</div>')
     return f'<div class="sheet"><hr><div class="facts">{fh}</div><div class="opts">{"".join(opts)}</div></div>'
 
 
@@ -442,7 +508,7 @@ def _card(r: DestReport, cfg, i: int) -> str:
                  if spark else f'<span class="trend">{_delta(cfg, r)}</span>')
         more = len({(x.outbound.flight_number, x.inbound.flight_number) for x in r.options}) - 1
         body = (f'<span class="pills">{"".join(badges)}</span>'
-                f'<span><span class="tot num">{_m(cfg, r.price)}</span><span class="unit">/ pax</span><br>'
+                f'<span><span class="tot num{" lo" if r.is_cheapest else ""}">{_m(cfg, r.price)}</span><span class="unit">/ pax</span><br>'
                 f'<span class="per num">Total: {_m(cfg, r.price * n)} for {n}</span></span>{trend}'
                 f'<span class="via">{avatar(q.outbound.airline, q.outbound.flight_number)}<span><b>{e(q.airline)}</b></span>'
                 f'<span class="t num">{e(q.outbound.flight_number)}' + (f" · +{more} more" if more else "") + '</span></span>')
@@ -458,9 +524,9 @@ def _card(r: DestReport, cfg, i: int) -> str:
             f'<div class="reveal" id="s{i}"><div>{_sheet(r, cfg)}</div></div></article>')
 
 
-def _spot(label, city, big, cap, save=False) -> str:
+def _spot(label, city, big, cap, save=False, lo=False) -> str:
     return (f'<div class="s glass{" save" if save else ""}"><div class="eyebrow">{e(label)}</div>'
-            f'<div class="city">{e(city)}</div><div class="big num">{big}</div><div class="cap num">{cap}</div></div>')
+            f'<div class="city">{e(city)}</div><div class="big num{" lo" if lo else ""}">{big}</div><div class="cap num">{cap}</div></div>')
 
 
 def _content(rep: DailyReport | None, cfg: Config) -> str:
@@ -494,12 +560,16 @@ def _content(rep: DailyReport | None, cfg: Config) -> str:
         return f'<div class="wrap" data-generated="">{"".join(P)}</div><script>{JS}</script>'
 
     if rep.priced:
+        top = max(r.value_score for r in rep.priced)
+        for r in rep.priced:                          # value tier relative to the best score today
+            ratio = r.value_score / top
+            r.tier = "tier-hi" if ratio >= .9 else ("tier-mid" if ratio >= .75 else "tier-lo")
         S = []
         v, c = rep.by_value[0], rep.cheapest
         unit = '<span class="unit">/ pax</span>'
         S.append(_spot("Best value", v.dest.name, f"{_m(cfg, v.price)}{unit}", f"{_m(cfg, v.price * n)} for {n}"))
         S.append(_spot("Lowest price", c.dest.name, f"{_m(cfg, c.price)}{unit}",
-                       f"{_m(cfg, c.price * n)} for {n} · {e(c.best.airline)}"))
+                       f"{_m(cfg, c.price * n)} for {n} · {e(c.best.airline)}", lo=True))
         drops = [r for r in rep.priced if r.delta is not None and r.delta < -0.5]
         if drops:
             m = min(drops, key=lambda r: r.delta)
@@ -516,10 +586,12 @@ def _content(rep: DailyReport | None, cfg: Config) -> str:
     if rep.priced:
         top = max(r.value_score for r in rep.priced)
         bars = "".join(
-            f'<span class="n">{e(r.dest.name)}</span><span class="track"><i style="width:{r.value_score / top * 100:.0f}%">'
-            f'</i></span><span class="num">{r.value_score:.1f}</span>'
+            f'<span class="n">{e(r.dest.name)}</span><span class="track {r.tier}"><i style="width:{r.value_score / top * 100:.0f}%">'
+            f'</i></span><span class="num sc {r.tier}">{r.value_score:.1f}</span>'
             f'<span class="v num">{_m(cfg, r.trip_cost)} all-in</span>' for r in rep.by_value)
-        P.append('<section><div class="sech"><h2>Value ranking</h2><span>Experience ÷ all-in cost per pax</span></div>'
+        legend = ('<span class="legend"><span class="tier-hi"><i></i>High</span><span class="tier-mid"><i></i>Moderate</span>'
+                  '<span class="tier-lo"><i></i>Lower</span></span>')
+        P.append(f'<section><div class="sech"><h2>Value ranking</h2>{legend}</div>'
                  f'<div class="rank glass"><div class="bars">{bars}</div></div></section>')
 
     cov = coverage([q for r in rep.rows for q in r.options])
@@ -530,13 +602,14 @@ def _content(rep: DailyReport | None, cfg: Config) -> str:
 
     P.append("<footer>Per adult, round trip, one checked bag. Budget-airline bag fees are estimates. "
              "Confirm the price when booking.</footer>")
-    return (f'<div class="wrap" data-generated="{rep.fetched_at}">{"".join(P)}</div>'
+    relay = os.environ.get("REFRESH_URL", "")
+    return (f'<div class="wrap" data-generated="{rep.fetched_at}" data-refresh="{e(relay, quote=True)}">{"".join(P)}</div>'
             f'<script>{JS}</script>')
 
 
 def render_fragment(rep: DailyReport | None, cfg: Config) -> str:
     """Page without the document skeleton (for hosts that wrap it themselves)."""
-    return (f"<title>{cfg.trip.origin} Flight Tracker</title>\n"
+    return (f"<title>{cfg.trip.origin} Flight Tracker</title>\n{FAVICON}\n"
             '<meta name="claude:viewport-fit-sides" content="cover">\n'
             f"{FONTS}\n<style>{CSS}</style>\n{_content(rep, cfg)}")
 
@@ -544,5 +617,5 @@ def render_fragment(rep: DailyReport | None, cfg: Config) -> str:
 def render_dashboard(rep: DailyReport | None, cfg: Config) -> str:
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'>"
             "<meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'>"
-            f"<title>{cfg.trip.origin} Flight Tracker</title>{FONTS}<style>{CSS}</style></head>"
+            f"<title>{cfg.trip.origin} Flight Tracker</title>{FAVICON}{FONTS}<style>{CSS}</style></head>"
             f"<body>{_content(rep, cfg)}</body></html>")
