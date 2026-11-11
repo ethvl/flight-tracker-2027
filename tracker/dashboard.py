@@ -349,7 +349,8 @@ def _actions(links: dict) -> str:
     out = [f'<a class="book" href="{e(url, quote=True)}" target="_blank" rel="noopener" title="{e(title, quote=True)}">'
            f'{label} <span class="arr" aria-hidden="true">→</span></a>']
     for k, v in rest:
-        out.append(f'<a class="alt" href="{e(v, quote=True)}" target="_blank" rel="noopener">{e(k.split(" (")[0])}</a>')
+        short = "Exact search" if "exact" in k else k.split(" (")[0]
+        out.append(f'<a class="alt" href="{e(v, quote=True)}" target="_blank" rel="noopener">{e(short)}</a>')
     return f'<div class="acts">{"".join(out)}</div>'
 
 

@@ -24,5 +24,6 @@ def apply_baggage(quote, cfg: dict):
         worst = max(results, key=lambda r: r[1])
         # mixed carriers: half the round-trip fee for each paid direction
         fee = worst[1] if len(results) == 1 else sum(r[1] for r in results) / 2
-        quote.bag_included, quote.bag_fee_per_pax, quote.bag_note = False, round(fee, 2), worst[2]
+        note = worst[2] if len(results) == 1 else f"incl. est. {fee:.0f} checked-bag add-on (budget-airline leg)"
+        quote.bag_included, quote.bag_fee_per_pax, quote.bag_note = False, round(fee, 2), note
     return quote
