@@ -12,6 +12,7 @@ import os
 import sys
 from datetime import datetime
 from functools import lru_cache
+from zoneinfo import ZoneInfo
 from html import escape as e
 
 from .aggregate import coverage
@@ -228,6 +229,7 @@ background:var(--btn);color:var(--btn-ink);transition:transform .2s var(--ease),
 .d.open .facts{grid-template-columns:repeat(4,minmax(0,1fr))}.d.open .opts{grid-template-columns:1fr}}
 @media (min-width:900px){.d.open .opt{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px 20px;align-items:start}
 .d.open .opt>.hd,.d.open .opt>.sel,.d.open .opt>.acts{grid-column:1/-1}}
+.pill.rec{color:#fff;background:var(--green);border-color:transparent;font-weight:600;vertical-align:2px;margin-left:6px}
 .sel{display:flex;flex-direction:column;gap:8px}
 /* price + value colour coding */
 .tot.lo,.big.lo,.opt .hd .num.lo{color:var(--green)}
@@ -282,7 +284,19 @@ JS = """
      - under `python -m tracker serve`: via api/refresh on the same server
      - with neither: just look for a newer published snapshot */
   var rb=document.getElementById('refresh'),stamp=document.getElementById('stamp'),wrap=document.querySelector('.wrap');
-  var relay=wrap.getAttribute('data-refresh')||'',gen=wrap.getAttribute('data-generated')||'',base=stamp.textContent;
+  var relay=wrap.getAttribute('data-refresh')||'',gen=wrap.getAttribute('data-generated')||'';
+  /* live "updated x ago" indicator */
+  var ts=Date.parse(wrap.getAttribute('data-ts')||'');
+  function ago(){
+    if(isNaN(ts)||rb.disabled)return;
+    var m=Math.max(0,Math.round((Date.now()-ts)/60000)),txt;
+    if(m<2)txt='just now';else if(m<60)txt=m+' min ago';
+    else if(m<48*60)txt=Math.round(m/60)+' h ago';else txt=Math.round(m/1440)+' days ago';
+    stamp.textContent='Live · Updated '+txt;
+    stamp.title=new Date(ts).toLocaleString();
+  }
+  ago();setInterval(ago,60000);
+  var base=stamp.textContent;
   function hhmm(d){return (d||new Date()).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}
   function busy(on){rb.disabled=on;rb.classList.toggle('spin',on);wrap.classList.toggle('loading',on)}
   function finish(msg){busy(false);stamp.textContent=msg}
@@ -532,7 +546,7 @@ def _sheet(r: DestReport, cfg) -> str:
     for q in r.options:                                   # one block per itinerary, its sellers listed inside
         groups.setdefault((q.outbound.flight_number, q.inbound.flight_number), []).append(q)
     opts = []
-    for qs in groups.values():
+    for gi, qs in enumerate(groups.values()):
         q = qs[0]                                         # cheapest seller for this itinerary
         bag = "Bag included" if q.bag_included else f"Incl. {_m(cfg, q.bag_fee_per_pax)} bag (est.)"
         named = [x for x in qs if x.seller and x.seller != "Google Flights"]
@@ -543,13 +557,14 @@ def _sheet(r: DestReport, cfg) -> str:
                 f'<span>{e(x.seller)}</span><span class="sp num">{_m(cfg, x.total_per_pax)}</span>'
                 + (f'<a class="alt" href="{e(x.booking_url, quote=True)}" target="_blank" rel="noopener">Book</a>'
                    if x.booking_url else "<span></span>") for x in named)
-            sellers = f'<div class="sel"><div class="legname"><span>Sellers · per pax</span></div><div class="sellers">{rows}</div></div>'
+            sellers = f'<div class="sel"><div class="legname"><span>Provider · per pax</span></div><div class="sellers">{rows}</div></div>'
         opts.append(
             f'<div class="opt"><div class="hd"><span class="who">{avatar(q.outbound.airline, q.outbound.flight_number, "lg")}'
-            f'<span><b>{e(q.airline)}</b><br><span class="fl">{e(bag)}</span></span></span>'
+            f'<span><b>{e(q.airline)}</b>{' <span class="pill rec">Recommended</span>' if gi == 0 else ""}'
+            f'<br><span class="fl">{e(bag)}</span></span></span>'
             f'<span class="num{" lo" if q.total_per_pax <= lowest else ""}">{_m(cfg, q.total_per_pax)} <small>/ pax</small><br>'
             f'<small>{_m(cfg, q.total_per_pax * n)} for {n}</small></span></div>'
-            f'{_route("Outbound", q.outbound, cfg)}{_route("Return", q.inbound, cfg)}{sellers}{_book(links, n)}</div>')
+            f'{_route("Departure", q.outbound, cfg)}{_route("Return", q.inbound, cfg)}{sellers}{_book(links, n)}</div>')
     return f'<div class="sheet"><hr><div class="facts">{fh}</div><div class="opts">{"".join(opts)}</div></div>'
 
 
@@ -668,14 +683,19 @@ def _content(rep: DailyReport | None, cfg: Config) -> str:
              f'<div class="grid">{cards}</div></section>')
 
     if rep.priced:
-        top = max(r.value_score for r in rep.priced)
+        by_price = sorted(rep.priced, key=lambda r: r.price)
+        lo, hi = by_price[0].price, by_price[-1].price
+
+        def tier(price):                              # colour by how far above the cheapest fare
+            return "tier-hi" if price <= lo * 1.10 else ("tier-mid" if price <= lo * 1.30 else "tier-lo")
         bars = "".join(
-            f'<span class="n">{e(r.dest.name)}</span><span class="track {r.tier}"><i style="width:{r.value_score / top * 100:.0f}%">'
-            f'</i></span><span class="num sc {r.tier}">{r.value_score:.1f}</span>'
-            f'<span class="v num">{_m(cfg, r.trip_cost)} all-in</span>' for r in rep.by_value)
-        legend = ('<span class="legend"><span class="tier-hi"><i></i>High</span><span class="tier-mid"><i></i>Moderate</span>'
-                  '<span class="tier-lo"><i></i>Lower</span></span>')
-        P.append(f'<section><div class="sech"><h2>Value ranking</h2>{legend}</div>'
+            f'<span class="n">{i}. {e(r.dest.name)}</span><span class="track {tier(r.price)}">'
+            f'<i style="width:{max(8, r.price / hi * 100):.0f}%"></i></span>'
+            f'<span class="num sc {tier(r.price)}">{_m(cfg, r.price)}</span>'
+            f'<span class="v num">{_m(cfg, r.price * n)} for {n}</span>' for i, r in enumerate(by_price, 1))
+        legend = ('<span class="legend"><span class="tier-hi"><i></i>Lowest</span><span class="tier-mid"><i></i>Up to 30% more</span>'
+                  '<span class="tier-lo"><i></i>Higher</span></span>')
+        P.append(f'<section><div class="sech"><h2>Price Ranking</h2>{legend}</div>'
                  f'<div class="rank glass"><div class="bars">{bars}</div></div></section>')
 
     cov = coverage([q for r in rep.rows for q in r.options])
@@ -691,7 +711,11 @@ def _content(rep: DailyReport | None, cfg: Config) -> str:
     P.append("<footer>Per adult, round trip, one checked bag. Budget-airline bag fees are estimates. "
              "Confirm the price when booking." + (f"<br>Photos via Wikimedia Commons: {credit}" if credit else "") + "</footer>")
     relay = os.environ.get("REFRESH_URL", "")
-    return (f'<div class="wrap" data-generated="{rep.fetched_at}" data-refresh="{e(relay, quote=True)}">{"".join(P)}</div>'
+    ts = ""
+    if rep.fetched_at:                               # absolute time, so "x min ago" is right in any viewer's timezone
+        ts = datetime.fromisoformat(rep.fetched_at).replace(
+            tzinfo=ZoneInfo(cfg.schedule.get("timezone", "Asia/Singapore"))).isoformat()
+    return (f'<div class="wrap" data-generated="{rep.fetched_at}" data-ts="{ts}" data-refresh="{e(relay, quote=True)}">{"".join(P)}</div>'
             f'<script>{JS}</script>')
 
 
