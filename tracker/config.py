@@ -61,6 +61,7 @@ class Config:
     baggage: dict = field(default_factory=dict)
     deals: dict = field(default_factory=dict)
     schedule: dict = field(default_factory=dict)
+    overview: dict = field(default_factory=dict)
     database: Path = ROOT / "data" / "prices.db"
 
     def dest(self, code: str) -> Destination:
@@ -112,5 +113,6 @@ def load_config(path: str | Path | None = None) -> Config:
         baggage=raw.get("baggage", {}),
         deals=raw.get("deals", {}),
         schedule=raw.get("schedule", {}),
+        overview=raw.get("overview", {}),
         database=db,
     )

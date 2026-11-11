@@ -349,6 +349,8 @@ JS = """
 })();
 """
 
+COUNTRY_CODES = {"Japan": "JP", "South Korea": "KR"}
+
 PHOTO_DIR = ROOT / "assets" / "photos"
 PHOTO_WIDTH = 1200          # px; banners are at most ~600px wide, so this is sharp on 2x screens
 # colour backdrop per destination, used until a photo is added to assets/photos/
@@ -654,23 +656,26 @@ def _content(rep: DailyReport | None, cfg: Config) -> str:
     chips = [_chip("cal", f"{t.depart_date:%d}–{t.return_date:%d %b %Y}"), _chip("moon", f"{t.nights} Nights"),
              _chip("plane", "Direct Only"), _chip("bag", "Checked Bag Included"), _chip("clock", f"Lands < {_cut(cfg)}")]
     countries = list(dict.fromkeys(d.country for d in cfg.destinations))
-    where = " & ".join([", ".join(countries[:-1]), countries[-1]]) if len(countries) > 1 else countries[0]
+    # set in config.yaml (overview); falls back to country codes and each destination's first airport
+    cc = cfg.overview.get("title") or "/".join(COUNTRY_CODES.get(c, c[:2].upper()) for c in countries)
+    airports = cfg.overview.get("subtitle") or "/".join(d.airports[0] for d in cfg.destinations)
     icon = lambda d: (f'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="{d}" fill="none" stroke="currentColor" '
                       'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>')
     P = [f'<header class="bar"><h1>Flight Tracker</h1>'
          f'<span class="status"><span class="dot{"" if live else " idle"}"></span><span id="stamp">'
          + (f"Live · Updated {now:%d %b, %H:%M}" if now else "No live fares yet") + '</span></span>'
-         f'<span class="tools"><button class="rbtn" id="refresh" type="button">'
-         f'{icon("M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5")}Refresh Fares</button>'
+         f'<span class="tools">'
          f'<button class="tbtn" id="theme" type="button" aria-pressed="false" aria-label="Switch to dark mode">'
          f'<span style="display:contents">{icon("M12 4V2M12 22v-2M4 12H2M22 12h-2M5.6 5.6 4.2 4.2M19.8 19.8l-1.4-1.4M5.6 18.4l-1.4 1.4M19.8 4.2l-1.4 1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z").replace("<svg", "<svg class=\"sun\"")}</span>'
          f'<span style="display:contents">{icon("M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z").replace("<svg", "<svg class=\"moon\"")}</span>'
-         f'</button></span></header>',
+         f'</button>'
+         f'<button class="rbtn" id="refresh" type="button">'
+         f'{icon("M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5")}Refresh Fares</button></span></header>',
          f'<div class="ov glass"><div class="ovr"><div class="pt"><div class="ovc">{t.origin}</div>'
          f'<div class="city">{e(CITY.get(t.origin, t.origin))}</div></div>'
          f'<div class="path"><div class="ln">{PLANE}</div></div>'
-         f'<div class="pt r"><div class="ovc">{len(cfg.destinations)} Destinations</div>'
-         f'<div class="city">{e(where)}</div></div></div>'
+         f'<div class="pt r"><div class="ovc">{e(cc)}</div>'
+         f'<div class="city num">{e(airports)}</div></div></div>'
          f'<div class="chips">{"".join(chips)}</div></div>']
     if not live:
         P.append('<div class="empty glass"><h2>No live fares yet</h2><p>Connect a fare source, then run the tracker. '

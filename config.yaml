@@ -35,6 +35,11 @@ destinations:
   - {code: PUS, name: Busan,   country: South Korea, tag: Coastal, airports: [PUS], primary: true,
      experience_score: 8.0, daily_ground_cost: 120}
 
+# Text on the right of the route card at the top of the page
+overview:
+  title: JP/KR
+  subtitle: OKA/NRT/CJU/ICN/KIX/PUS
+
 # ---------------------------------------------------------------------------
 # Data provider
 # ---------------------------------------------------------------------------
