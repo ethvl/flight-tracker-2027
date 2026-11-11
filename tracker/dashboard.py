@@ -167,10 +167,12 @@ padding:20px var(--pad) 16px;color:#fff;background-color:#2c3440;background-imag
 .plus svg{width:14px;height:14px}
 .head:hover .plus{background:rgba(0,0,0,.6)}
 .plus:active{transform:scale(.9)}
-.open .plus{top:16px;right:16px;width:40px;height:40px;transform:rotate(45deg);background:rgba(0,0,0,.6);
-box-shadow:0 0 0 1px rgba(255,255,255,.25),0 6px 18px rgba(0,0,0,.25)}
+.open .plus{top:20px;right:20px;left:auto;z-index:30;width:42px;height:42px;transform:rotate(45deg);background:rgba(24,24,27,.82);
+box-shadow:0 0 0 1px rgba(255,255,255,.22),0 10px 24px -6px rgba(0,0,0,.45)}
+:root[data-theme='dark'] .open .plus{background:rgba(255,255,255,.2)}
 .open .plus svg{width:16px;height:16px}
-.open .head:hover .plus,.open .plus:hover{background:rgba(0,0,0,.8)}
+.open .head:hover .plus,.open .plus:hover{background:#18181b}
+:root[data-theme='dark'] .open .head:hover .plus{background:rgba(255,255,255,.32)}
 /* expanded card: left column = photo + price only; everything else lives in the right column */
 .d.open .head .trend,.d.open .head .via{display:none}
 .facts .up b{color:var(--red)}.facts .down b{color:var(--green)}
@@ -227,13 +229,19 @@ background:var(--btn);color:var(--btn-ink);transition:transform .2s var(--ease),
 .opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px 32px}
 .opts .opt{padding-top:20px;border-top:1px solid var(--line)}
 /* open card: full row; summary column left (sticky), flights right; close button pinned top-right */
-@media (min-width:641px){.d.open{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,320px) minmax(0,1fr);align-items:start}
+@media (min-width:641px){.d.open{grid-column:1/-1;display:grid;grid-template-columns:minmax(260px,1fr) minmax(0,2fr);column-gap:36px;align-items:start}
+.d.open .ban{height:260px}
 
-.d.open .sheet{padding:72px 28px 28px 8px}.d.open .sheet>hr:first-child{display:none}
+.d.open .sheet{padding:84px 36px 36px 0}.d.open .sheet>hr:first-child{display:none}
 .d.open .facts{grid-template-columns:repeat(4,minmax(0,1fr))}.d.open .opts{grid-template-columns:1fr}}
-@media (min-width:900px){.d.open .opt{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px 20px;align-items:start}
+@media (min-width:900px){.d.open .opt{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px 24px;align-items:start}
+.d.open .opts{gap:32px}
+.d.open .opts .opt{padding-top:28px}
+.d.open .facts{gap:18px 24px}
 .d.open .opt>.hd,.d.open .opt>.sel,.d.open .opt>.acts{grid-column:1/-1}}
 .pill.rec{color:#fff;background:var(--green);border-color:transparent;font-weight:600;vertical-align:2px;margin-left:6px}
+.ban .pill.rec{margin-left:0;color:#052e12;background:#6ee79a}
+.eyebrow .pill.rec{margin-left:8px;color:#052e12;background:#6ee79a;font-size:.68rem;padding:2px 8px}
 .sel{display:flex;flex-direction:column;gap:8px}
 /* price + value colour coding */
 .tot.lo,.big.lo,.opt .hd .num.lo{color:var(--green)}
@@ -583,6 +591,7 @@ def _card(r: DestReport, cfg, i: int) -> str:
     badges = [f'<span class="pill">{e(" · ".join(x for x in (r.dest.country, r.dest.tag) if x))}</span>']
     if r.best:
         if r.is_cheapest:
+            badges.insert(0, '<span class="pill rec">Recommended</span>')
             badges.append('<span class="pill solid">Cheapest</span>')
         if r.value_rank == 1:
             badges.append('<span class="pill solid">Best value</span>')
@@ -628,9 +637,10 @@ def _photo_css(codes) -> str:
     return f"<style>{rules}</style>" if rules else ""
 
 
-def _spot(label, city, big, cap, save=False, lo=False, code="") -> str:
+def _spot(label, city, big, cap, save=False, lo=False, code="", rec=False) -> str:
     ph = f" ph ph-{code}" if code else ""
-    return (f'<div class="s glass{" save" if save else ""}{ph}"{_ph(code) if code else ""}><div class="eyebrow">{e(label)}</div>'
+    tag = '<span class="pill rec">Recommended</span>' if rec else ""
+    return (f'<div class="s glass{" save" if save else ""}{ph}"{_ph(code) if code else ""}><div class="eyebrow">{e(label)}{tag}</div>'
             f'<div class="city">{e(city)}</div><div class="big num{" lo" if lo else ""}">{big}</div><div class="cap num">{cap}</div></div>')
 
 
@@ -675,14 +685,14 @@ def _content(rep: DailyReport | None, cfg: Config) -> str:
         v, c = rep.by_value[0], rep.cheapest
         unit = '<span class="unit">/ pax</span>'
         S.append(_spot("Best value", v.dest.name, f"{_m(cfg, v.price)}{unit}", f"{_m(cfg, v.price * n)} for {n}",
-                       code=v.dest.code))
+                       code=v.dest.code, rec=v is c))
         S.append(_spot("Lowest price", c.dest.name, f"{_m(cfg, c.price)}{unit}",
-                       f"{_m(cfg, c.price * n)} for {n} · {e(c.best.airline)}", lo=True, code=c.dest.code))
+                       f"{_m(cfg, c.price * n)} for {n} · {e(c.best.airline)}", lo=True, code=c.dest.code, rec=True))
         drops = [r for r in rep.priced if r.delta is not None and r.delta < -0.5]
         if drops:
             m = min(drops, key=lambda r: r.delta)
             S.append(_spot("Biggest drop", m.dest.name, f"−{_m(cfg, -m.delta)}{unit}",
-                           f"−{_m(cfg, -m.delta * n)} for {n} · vs. yesterday", save=True, code=m.dest.code))
+                           f"−{_m(cfg, -m.delta * n)} for {n} · vs. yesterday", save=True, code=m.dest.code, rec=m is c))
         else:
             S.append(_spot("Biggest drop", "None today", "—", "No fare fell"))
         P.append(f'<div class="spot">{"".join(S)}</div>')
