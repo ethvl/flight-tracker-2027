@@ -229,10 +229,13 @@ background:var(--btn);color:var(--btn-ink);transition:transform .2s var(--ease),
 .opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px 32px}
 .opts .opt{padding-top:20px;border-top:1px solid var(--line)}
 /* open card: full row; summary column left (sticky), flights right; close button pinned top-right */
-@media (min-width:641px){.d.open{grid-column:1/-1;display:grid;grid-template-columns:minmax(260px,1fr) minmax(0,2fr);column-gap:36px;align-items:start}
-.d.open .ban{height:260px}
+@media (min-width:641px){.d.open{grid-column:1/-1;display:grid;grid-template-columns:minmax(260px,1fr) minmax(0,2fr);column-gap:36px;
+align-items:start;padding:28px;background:var(--card-hi)}
+.d.open .head{--pad:0px;padding:0;gap:18px;border-radius:18px}
+.d.open .ban{height:260px;margin:0;border-radius:18px;padding:20px 20px 16px}
+.d.open .reveal,.d.open .reveal>div,.d.open .sheet{background:transparent;border:0;box-shadow:none}
 
-.d.open .sheet{padding:84px 36px 36px 0}.d.open .sheet>hr:first-child{display:none}
+.d.open .sheet{padding:56px 0 0}.d.open .sheet>hr:first-child{display:none}
 .d.open .facts{grid-template-columns:repeat(4,minmax(0,1fr))}.d.open .opts{grid-template-columns:1fr}}
 @media (min-width:900px){.d.open .opt{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px 24px;align-items:start}
 .d.open .opts{gap:32px}
