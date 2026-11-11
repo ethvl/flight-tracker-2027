@@ -117,6 +117,14 @@ section{display:flex;flex-direction:column;gap:24px;min-width:0}
 .s::before{content:"";position:absolute;left:50%;top:-90px;width:260px;height:180px;transform:translateX(-50%);border-radius:50%;
 background:var(--tint,var(--glow1));filter:blur(50px);pointer-events:none}
 .s.save{--tint:var(--green-bg)}
+.s.ph{border:0;color:#fff;background-color:#1d232c;background-image:linear-gradient(180deg,rgba(0,0,0,.28) 0%,rgba(0,0,0,.42) 45%,rgba(0,0,0,.78) 100%),var(--img),var(--tint-bg,none);
+background-size:cover;background-position:center;background-repeat:no-repeat;box-shadow:var(--ambient)}
+.s.ph::before{display:none}
+.s.ph .eyebrow{color:rgba(255,255,255,.85)}
+.s.ph .city{color:#fff}
+.s.ph .big{color:#fff;text-shadow:0 2px 18px rgba(0,0,0,.35)}
+.s.ph .big.lo,.s.ph.save .big{color:#6ee79a}
+.s.ph .cap,.s.ph .unit{color:rgba(255,255,255,.82)}
 .eyebrow{font-size:.8rem;font-weight:600;color:var(--ink2);position:relative}
 .s .city{font-size:1.5rem;font-weight:600;letter-spacing:-.02em;position:relative}
 .s .big{font-size:clamp(2.6rem,4.6vw,3.4rem);font-weight:700;letter-spacing:-.045em;line-height:1.05;margin-top:14px;position:relative}
@@ -131,10 +139,12 @@ background:var(--tint,var(--glow1));filter:blur(50px);pointer-events:none}
 .d.na{box-shadow:none}
 .d.na .name,.d.na .tot{color:var(--muted)}
 .head{all:unset;box-sizing:border-box;display:flex;flex-direction:column;gap:18px;width:100%;--pad:24px;padding:var(--pad);cursor:pointer;border-radius:24px}
-.d{overflow:hidden}
+.d{overflow:hidden;isolation:isolate}
+.d.glass{border:0;box-shadow:0 0 0 1px var(--line),var(--ambient)}
+.d.glass.open,.d.glass:hover{box-shadow:0 0 0 1px var(--line-hi),var(--ambient)}
 /* photo banner with legible overlay text */
-.ban{position:relative;display:flex;flex-direction:column;justify-content:flex-end;gap:10px;min-height:200px;margin:calc(-1*var(--pad)) calc(-1*var(--pad)) 0;
-padding:20px var(--pad) 16px;color:#fff;background-color:#2c3440;background-image:var(--img),var(--tint-bg,linear-gradient(135deg,#46566e,#1d232c));background-size:cover;background-position:center}
+.ban{position:relative;display:flex;flex-direction:column;justify-content:flex-end;gap:10px;height:200px;box-sizing:border-box;overflow:hidden;margin:calc(-1*var(--pad)) calc(-1*var(--pad)) 0;
+padding:20px var(--pad) 16px;color:#fff;background-color:#2c3440;background-image:var(--img),var(--tint-bg,linear-gradient(135deg,#46566e,#1d232c));background-size:cover;background-position:center;background-repeat:no-repeat}
 .ban::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05) 0%,rgba(0,0,0,.18) 40%,rgba(0,0,0,.72) 100%)}
 .ban>*{position:relative}
 .ban .name{color:#fff;font-size:1.5rem;font-weight:700;text-shadow:0 1px 12px rgba(0,0,0,.35)}
@@ -154,7 +164,11 @@ padding:20px var(--pad) 16px;color:#fff;background-color:#2c3440;background-imag
 .where{font-size:.82rem;color:var(--muted);font-weight:400}
 .plus{position:absolute;top:14px;right:14px;z-index:3;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:rgba(0,0,0,.38);color:#fff;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:transform .45s var(--ease),background-color .2s}
 .plus svg{width:14px;height:14px}
-.open .plus{transform:rotate(45deg);background:rgba(0,0,0,.55)}
+.head:hover .plus{background:rgba(0,0,0,.58)}
+.plus:active{transform:scale(.9)}
+.open .plus{left:14px;right:auto;width:36px;height:36px;transform:rotate(45deg);background:rgba(0,0,0,.5)}
+.open .head:hover .plus{background:rgba(0,0,0,.72);transform:rotate(45deg) scale(1.06)}
+.open .ban{padding-top:58px}
 .price{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
 .tot{font-size:2.6rem;font-weight:700;letter-spacing:-.04em;line-height:1}
 .per{font-size:.9rem;color:var(--ink2);margin-top:8px;font-weight:400}
@@ -209,7 +223,7 @@ background:var(--btn);color:var(--btn-ink);transition:transform .2s var(--ease),
 .opts .opt{padding-top:20px;border-top:1px solid var(--line)}
 /* open card: full row; summary column left (sticky), flights right; close button pinned top-right */
 @media (min-width:641px){.d.open{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,320px) minmax(0,1fr);align-items:start}
-.d.open .head{position:sticky;top:12px}
+
 .d.open .sheet{padding:24px 64px 28px 8px}.d.open .sheet>hr:first-child{display:none}
 .d.open .facts{grid-template-columns:repeat(4,minmax(0,1fr))}.d.open .opts{grid-template-columns:1fr}}
 @media (min-width:900px){.d.open .opt{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px 20px;align-items:start}
@@ -236,7 +250,7 @@ footer a{color:inherit}
 footer{color:var(--muted);font-size:.78rem;max-width:80ch;line-height:1.6}
 @media (max-width:1000px){.spot{grid-template-columns:1fr}.s{padding:28px}}
 @media (max-width:640px){.wrap{gap:48px;padding-block:36px 64px}.grid{grid-template-columns:1fr;gap:14px}.spot{gap:14px}
-.ov{grid-template-columns:1fr;padding:22px}.ov .chips{justify-content:flex-start}.ovr{gap:10px}.rbtn{padding:9px 14px}.head{--pad:20px}.ban{min-height:150px}.sheet{padding:0 22px 22px}.rank{padding:24px}.bars{grid-template-columns:auto minmax(0,1fr) auto}.bars .v{display:none}.d:hover{transform:none}}
+.ov{grid-template-columns:1fr;padding:22px}.ov .chips{justify-content:flex-start}.ovr{gap:10px}.rbtn{padding:9px 14px}.head{--pad:20px}.ban{height:180px}.sheet{padding:0 22px 22px}.rank{padding:24px}.bars{grid-template-columns:auto minmax(0,1fr) auto}.bars .v{display:none}.d:hover{transform:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 """)
 
@@ -542,11 +556,7 @@ def _sheet(r: DestReport, cfg) -> str:
 def _card(r: DestReport, cfg, i: int) -> str:
     n = max(cfg.trip.pax)
     sub = r.dest.airport_label + (" · via Osaka" if r.dest.code == "KIX" else "")
-    img = _photo(r.dest.code)
-    tint = TINTS.get(r.dest.code)
-    style = "".join(x for x in (f"--img:url({img});" if img else "",
-                                f"--tint-bg:linear-gradient(135deg,{tint[0]},{tint[1]});" if tint else ""))
-    style = f' style="{style}"' if style else ""
+    style = _ph(r.dest.code)
     badges = [f'<span class="pill">{e(" · ".join(x for x in (r.dest.country, r.dest.tag) if x))}</span>']
     if r.best:
         if r.is_cheapest:
@@ -563,7 +573,7 @@ def _card(r: DestReport, cfg, i: int) -> str:
         trend = (f'<span class="trend">{spark[0]}<span class="lab">{spark[1]}d</span>{_delta(cfg, r)}</span>'
                  if spark else f'<span class="trend">{_delta(cfg, r)}</span>')
         more = len({(x.outbound.flight_number, x.inbound.flight_number) for x in r.options}) - 1
-        body = (f'<span class="ban"{style}><span><span class="name">{e(r.dest.name)}</span><br>'
+        body = (f'<span class="ban ph-{r.dest.code}"{style}><span><span class="name">{e(r.dest.name)}</span><br>'
                 f'<span class="where">{e(sub)}</span></span><span class="pills">{"".join(badges)}</span></span>'
                 f'<span><span class="tot num{" lo" if r.is_cheapest else ""}">{_m(cfg, r.price)}</span><span class="unit">/ pax</span><br>'
                 f'<span class="per num">Total: {_m(cfg, r.price * n)} for {n}</span></span>{trend}'
@@ -574,7 +584,7 @@ def _card(r: DestReport, cfg, i: int) -> str:
         if r.dest.primary:
             badges.append('<span class="pill solid">Primary pick</span>')
         badges.append(f'<span class="pill unmet" title="{e(why, quote=True)}">{e(label)}</span>')
-        body = (f'<span class="ban"{style}><span><span class="name">{e(r.dest.name)}</span><br>'
+        body = (f'<span class="ban ph-{r.dest.code}"{style}><span><span class="name">{e(r.dest.name)}</span><br>'
                 f'<span class="where">{e(sub)}</span></span><span class="pills">{"".join(badges)}</span></span>'
                 f'<span><span class="tot">No fare</span></span>')
     cls = "d glass" + ("" if r.best else " na")
@@ -583,8 +593,21 @@ def _card(r: DestReport, cfg, i: int) -> str:
             f'<div class="reveal" id="s{i}"><div>{_sheet(r, cfg)}</div></div></article>')
 
 
-def _spot(label, city, big, cap, save=False, lo=False) -> str:
-    return (f'<div class="s glass{" save" if save else ""}"><div class="eyebrow">{e(label)}</div>'
+def _ph(code: str) -> str:
+    """Inline colour backdrop for a destination (the photo itself comes from its .ph-CODE class)."""
+    tint = TINTS.get(code)
+    return f' style="--tint-bg:linear-gradient(135deg,{tint[0]},{tint[1]})"' if tint else ""
+
+
+def _photo_css(codes) -> str:
+    """One CSS rule per destination photo, so each image is embedded in the page only once."""
+    rules = "".join(f".ph-{c}{{--img:url({img})}}" for c in dict.fromkeys(codes) if (img := _photo(c)))
+    return f"<style>{rules}</style>" if rules else ""
+
+
+def _spot(label, city, big, cap, save=False, lo=False, code="") -> str:
+    ph = f" ph ph-{code}" if code else ""
+    return (f'<div class="s glass{" save" if save else ""}{ph}"{_ph(code) if code else ""}><div class="eyebrow">{e(label)}</div>'
             f'<div class="city">{e(city)}</div><div class="big num{" lo" if lo else ""}">{big}</div><div class="cap num">{cap}</div></div>')
 
 
@@ -626,18 +649,20 @@ def _content(rep: DailyReport | None, cfg: Config) -> str:
         S = []
         v, c = rep.by_value[0], rep.cheapest
         unit = '<span class="unit">/ pax</span>'
-        S.append(_spot("Best value", v.dest.name, f"{_m(cfg, v.price)}{unit}", f"{_m(cfg, v.price * n)} for {n}"))
+        S.append(_spot("Best value", v.dest.name, f"{_m(cfg, v.price)}{unit}", f"{_m(cfg, v.price * n)} for {n}",
+                       code=v.dest.code))
         S.append(_spot("Lowest price", c.dest.name, f"{_m(cfg, c.price)}{unit}",
-                       f"{_m(cfg, c.price * n)} for {n} · {e(c.best.airline)}", lo=True))
+                       f"{_m(cfg, c.price * n)} for {n} · {e(c.best.airline)}", lo=True, code=c.dest.code))
         drops = [r for r in rep.priced if r.delta is not None and r.delta < -0.5]
         if drops:
             m = min(drops, key=lambda r: r.delta)
             S.append(_spot("Biggest drop", m.dest.name, f"−{_m(cfg, -m.delta)}{unit}",
-                           f"−{_m(cfg, -m.delta * n)} for {n} · vs. yesterday", save=True))
+                           f"−{_m(cfg, -m.delta * n)} for {n} · vs. yesterday", save=True, code=m.dest.code))
         else:
             S.append(_spot("Biggest drop", "None today", "—", "No fare fell"))
         P.append(f'<div class="spot">{"".join(S)}</div>')
 
+    P.insert(0, _photo_css(d.code for d in cfg.destinations))
     cards = "".join(_card(r, cfg, i) for i, r in enumerate(rep.rows))
     P.append('<section><div class="sech"><h2>Destinations</h2><span>Tap a card for flights</span></div>'
              f'<div class="grid">{cards}</div></section>')
