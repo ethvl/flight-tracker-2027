@@ -113,7 +113,7 @@ section{display:flex;flex-direction:column;gap:24px;min-width:0}
 .glass{transition:background-color .35s ease,border-color .35s ease;border:1px solid var(--line);border-radius:24px;background:var(--card);backdrop-filter:blur(24px) saturate(140%);
 -webkit-backdrop-filter:blur(24px) saturate(140%);box-shadow:var(--ambient)}
 /* spotlight */
-.spot{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.spot{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
 .s{position:relative;overflow:hidden;padding:32px;display:flex;flex-direction:column;gap:6px;min-width:0}
 .s::before{content:"";position:absolute;left:50%;top:-90px;width:260px;height:180px;transform:translateX(-50%);border-radius:50%;
 background:var(--tint,var(--glow1));filter:blur(50px);pointer-events:none}
@@ -692,8 +692,6 @@ def _content(rep: DailyReport | None, cfg: Config) -> str:
         S = []
         v, c = rep.by_value[0], rep.cheapest
         unit = '<span class="unit">/ pax</span>'
-        S.append(_spot("Best value", v.dest.name, f"{_m(cfg, v.price)}{unit}", f"{_m(cfg, v.price * n)} for {n}",
-                       code=v.dest.code, rec=v is c))
         S.append(_spot("Lowest price", c.dest.name, f"{_m(cfg, c.price)}{unit}",
                        f"{_m(cfg, c.price * n)} for {n} · {e(c.best.airline)}", lo=True, code=c.dest.code, rec=True))
         drops = [r for r in rep.priced if r.delta is not None and r.delta < -0.5]
